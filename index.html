@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autoxing Robot Control</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 600px;
+        margin: auto;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+      }
+      .result-table {
+        margin-top: 20px;
+        border-collapse: collapse;
+        width: 100%;
+      }
+      .result-table th,
+      .result-table td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+      }
+      .result-table th {
+        background-color: #f4f4f4;
+      }
+      .result-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Autoxing Robot Control Panel</h1>
+
+      <div class="form-group">
+        <label for="robotId">Robot ID:</label>
+        <input type="text" id="robotId" placeholder="Enter Robot ID" />
+      </div>
+
+      <div class="form-group">
+        <button id="initialize">Initialize SDK</button>
+      </div>
+
+      <div class="form-group">
+        <button id="connect">Connect to Robot</button>
+      </div>
+
+      <div class="form-group">
+        <button id="fetchTask">Fetch Current Task</button>
+      </div>
+
+      <div class="form-group">
+        <button id="fetchStatistics">Fetch Task Statistics</button>
+      </div>
+
+      <div class="result" id="result"></div>
+      <div class="result" id="statisticsResult"></div>
+    </div>
+
+    <script>
+      const backendUrl = "http://localhost:3000"; // URL ของ Express Backend
+      const resultDiv = document.getElementById("result");
+
+      document
+        .getElementById("initialize")
+        .addEventListener("click", async () => {
+          try {
+            const response = await axios.post(`${backendUrl}/init`);
+            resultDiv.innerHTML = `<p>${
+              response.data.message || "SDK Initialized!"
+            }</p>`;
+          } catch (error) {
+            resultDiv.innerHTML = `<p>Error: ${
+              error.response?.data?.error || error.message
+            }</p>`;
+          }
+        });
+
+      document.getElementById("connect").addEventListener("click", async () => {
+        const robotId = document.getElementById("robotId").value;
+
+        try {
+          const response = await axios.post(`${backendUrl}/connect`, {
+            robotId,
+          });
+          resultDiv.innerHTML = `<p>${
+            response.data.message || "Connected to Robot!"
+          }</p>`;
+        } catch (error) {
+          resultDiv.innerHTML = `<p>Error: ${
+            error.response?.data?.error || error.message
+          }</p>`;
+        }
+      });
+
+      document
+        .getElementById("fetchTask")
+        .addEventListener("click", async () => {
+          try {
+            const response = await axios.get(`${backendUrl}/current-task`);
+            const taskData = response.data;
+
+            if (taskData) {
+              resultDiv.innerHTML = generateTaskDetailsTable(taskData);
+            } else {
+              resultDiv.innerHTML = "<p>No Task Found</p>";
+            }
+          } catch (error) {
+            resultDiv.innerHTML = `<p>Error: ${
+              error.response?.data?.error || error.message
+            }</p>`;
+          }
+        });
+
+      // ฟังก์ชันแสดงรายละเอียด Task เป็นตาราง
+      function generateTaskDetailsTable(data) {
+        return `
+            <table class="result-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Task ID</td>
+                  <td>${data.taskId}</td>
+                </tr>
+                <tr>
+                  <td>Task Name</td>
+                  <td>${data.taskName || "Unnamed Task"}</td>
+                </tr>
+                <tr>
+                  <td>Robot ID</td>
+                  <td>${data.robotId}</td>
+                </tr>
+                <tr>
+                  <td>Task Type</td>
+                  <td>${data.taskType}</td>
+                </tr>
+                <tr>
+                  <td>Run Type</td>
+                  <td>${data.runType}</td>
+                </tr>
+                <tr>
+                  <td>Is Cancelled</td>
+                  <td>${data.isCancel ? "Yes" : "No"}</td>
+                </tr>
+                <tr>
+                  <td>Is Finished</td>
+                  <td>${data.isFinish ? "Yes" : "No"}</td>
+                </tr>
+                <tr>
+                  <td>Total Distance</td>
+                  <td>${data.totalDistance}</td>
+                </tr>
+                <tr>
+                  <td>Task Duration</td>
+                  <td>${data.taskDuration}</td>
+                </tr>
+              </tbody>
+            </table>`;
+      }
+
+      document
+        .getElementById("fetchStatistics")
+        .addEventListener("click", async () => {
+          const statisticsResultDiv =
+            document.getElementById("statisticsResult");
+          try {
+            const response = await axios.get(`${backendUrl}/task-statistics`);
+            const statisticsData = response.data.statistics;
+
+            if (statisticsData) {
+              statisticsResultDiv.innerHTML =
+                generateStatisticsTable(statisticsData);
+            } else {
+              statisticsResultDiv.innerHTML = "<p>No Statistics Data Found</p>";
+            }
+          } catch (error) {
+            statisticsResultDiv.innerHTML = `<p>Error: ${
+              error.response?.data?.error || error.message
+            }</p>`;
+          }
+        });
+
+      // ฟังก์ชันสร้างตารางสำหรับข้อมูล Statistics
+      function generateStatisticsTable(data) {
+        return `
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(data)
+            .map(([key, value]) => `<tr><td>${key}</td><td>${value}</td></tr>`)
+            .join("")}
+        </tbody>
+      </table>`;
+      }
+    </script>
+  </body>
+</html>

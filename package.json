@@ -1,0 +1,21 @@
+{
+  "name": "axtasklog",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@autoxing/robot-js-sdk": "^1.0.126",
+    "@autoxing/robot-js-sdk-dev": "^1.1.193",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "websocket": "^1.0.35",
+    "ws": "^8.18.0"
+  }
+}
