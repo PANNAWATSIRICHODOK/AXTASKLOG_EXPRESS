@@ -217,18 +217,84 @@ function calculateTotalDistance(taskPts) {
 app.get("/task-statistics", async (req, res) => {
   try {
     if (!axRobot) {
-      return res
-        .status(400)
-        .json({ message: "SDK not initialized. Call /init first." });
+      return res.status(400).json({
+        message: "SDK not initialized. Call /init first.",
+      });
     }
 
-    // รองรับพารามิเตอร์ทั้ง query และ body
-    const taskStatistics = { ...req.query, ...req.body };
+    const taskId = req.query.taskId;
+    const fields = Array.isArray(req.query.fields)
+      ? req.query.fields
+      : req.query.fields
+      ? req.query.fields.split(",")
+      : [
+          "cStartTime",
+          "cEndTime",
+          "mileage",
+          "disinfect",
+          "taskCancelCount",
+          "errCount",
+          "taskFinishCount",
+          "taskPauseCount",
+        ];
 
-    const result = await axRobot.getTaskStatistics(taskStatistics);
-    res.json({ statistics: result });
+    const validFields = [
+      "cStartTime",
+      "cEndTime",
+      "mileage",
+      "disinfect",
+      "taskCancelCount",
+      "errCount",
+      "taskFinishCount",
+      "taskPauseCount",
+    ];
+
+    const invalidFields = fields.filter(
+      (field) => !validFields.includes(field)
+    );
+
+    if (!taskId) {
+      return res.status(400).json({
+        message: "Missing required parameter: taskId",
+      });
+    }
+
+    if (invalidFields.length > 0) {
+      return res.status(400).json({
+        message: `Invalid fields provided: ${invalidFields.join(", ")}`,
+      });
+    }
+
+    const taskStatistics = { taskId, fields };
+
+    console.log("Task Statistics Parameters:", taskStatistics);
+
+    try {
+      const result = await axRobot.getTaskStatistics(taskStatistics);
+
+      console.log("Task Statistics Result (Logged):", result);
+
+      if (!result || Object.keys(result).length === 0) {
+        console.log("Debug: No statistics found for:", taskStatistics);
+        return res.status(404).json({
+          message: "No statistics data found for the given parameters.",
+        });
+      }
+
+      res.json({ statistics: result });
+    } catch (sdkError) {
+      console.error("SDK Error fetching task statistics:", sdkError);
+      return res.status(500).json({
+        message: "Error fetching task statistics from SDK",
+        error: sdkError.message || sdkError,
+      });
+    }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error("Error fetching task statistics:", e);
+    res.status(500).json({
+      error: e.message,
+      message: "An error occurred while fetching task statistics.",
+    });
   }
 });
 

@@ -187,7 +187,22 @@
           const statisticsResultDiv =
             document.getElementById("statisticsResult");
           try {
-            const response = await axios.get(`${backendUrl}/task-statistics`);
+            const response = await axios.get(`${backendUrl}/task-statistics`, {
+              params: {
+                taskId: "98914edb-ff80-4c7a-af33-3582d465a76a",
+                fields: [
+                  "cStartTime",
+                  "cEndTime",
+                  "mileage",
+                  "disinfect",
+                  "taskCancelCount",
+                  "errCount",
+                  "taskFinishCount",
+                  "taskPauseCount",
+                ],
+              },
+            });
+
             const statisticsData = response.data.statistics;
 
             if (statisticsData) {
@@ -198,7 +213,7 @@
             }
           } catch (error) {
             statisticsResultDiv.innerHTML = `<p>Error: ${
-              error.response?.data?.error || error.message
+              error.response?.data?.message || error.message
             }</p>`;
           }
         });
@@ -206,19 +221,19 @@
       // ฟังก์ชันสร้างตารางสำหรับข้อมูล Statistics
       function generateStatisticsTable(data) {
         return `
-      <table class="result-table">
-        <thead>
-          <tr>
-            <th>Field</th>
-            <th>Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${Object.entries(data)
-            .map(([key, value]) => `<tr><td>${key}</td><td>${value}</td></tr>`)
-            .join("")}
-        </tbody>
-      </table>`;
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Object.entries(data)
+          .map(([key, value]) => `<tr><td>${key}</td><td>${value}</td></tr>`)
+          .join("")}
+      </tbody>
+    </table>`;
       }
     </script>
   </body>
