@@ -3,253 +3,373 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Autoxing Robot Control</title>
+    <title>Robot Control Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
       rel="stylesheet"
     />
     <style>
-      .container {
-        background: #f9f9f9;
-        border-radius: 15px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-        width: auto;
-        padding: 30px;
-        text-align: center;
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
       }
-      h1 {
-        font-size: 2rem;
-        margin-bottom: 20px;
-        color: #1a73e8;
-        font-family: "Roboto", sans-serif;
-        text-align: left;
-      }
-      .form-group {
-        text-align: left;
-        margin-bottom: 20px;
-      }
-      .form-group input {
-        width: 500px;
-      }
-      label {
-        width: 20px;
-        font-weight: bold;
-        margin-bottom: 8px;
+
+      body {
+        background-color: #f5f7fa;
         color: #333;
-        font-family: "Roboto", sans-serif;
+        line-height: 1.6;
       }
-      input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        background: #fff;
-        color: #333;
-        font-size: 1rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        font-family: "Roboto", sans-serif;
+
+      .dashboard {
+        display: flex;
+        min-height: 100vh;
       }
-      button {
-        padding: 12px;
-        margin-top: 10px;
-        font-size: 1rem;
-        font-weight: bold;
-        background: #1a73e8;
-        border: none;
-        border-radius: 5px;
-        color: #fff;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-family: "Roboto", sans-serif;
-      }
-      button:hover {
-        background: #0056b3;
-        box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
-      }
-      .result,
-      .debug {
-        text-align: left;
-        font-size: 1rem;
-        padding: 15px;
-        color: #333;
-        overflow-x: auto;
-        font-family: "Roboto", sans-serif;
-      }
-      .result-table {
-        margin-top: 20px;
-        border-collapse: collapse;
-        width: 100%;
-        overflow-x: auto;
-      }
-      .result-table th,
-      .result-table td {
-        border: 1px solid #ddd;
-        padding: 12px;
-        text-align: left;
-        font-size: 1rem;
-      }
-      .result-table th {
-        background-color: #1a73e8;
-        color: #fff;
-      }
-      .debug {
-        background: #f5f5f5;
-        border: 1px solid #ccc;
-        padding: 10px;
-        margin-top: 20px;
+
+      .sidebar {
+        width: 260px;
+        background: #1a237e;
+        color: white;
+        padding: 20px;
+        position: fixed;
+        height: 100vh;
         overflow-y: auto;
-        max-height: 200px;
       }
+
+      .main-content {
+        flex: 1;
+        margin-left: 260px;
+        padding: 20px;
+      }
+
+      .logo {
+        font-size: 24px;
+        font-weight: bold;
+        padding: 15px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 20px;
+      }
+
+      .robot-list {
+        list-style: none;
+      }
+
+      .robot-item {
+        padding: 12px 15px;
+        margin: 5px 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .robot-item:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .robot-item.active {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .robot-status {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-left: auto;
+      }
+
+      .status-active {
+        background-color: #4caf50;
+      }
+
+      .status-idle {
+        background-color: #ffa000;
+      }
+
+      .robot-details {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      }
+
+      .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+      }
+
+      .detail-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1a237e;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #eee;
+      }
+
+      .stat-title {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 5px;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1a237e;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+      }
+
+      .data-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: #666;
+      }
+
+      @media (max-width: 1024px) {
+        .sidebar {
+          width: 200px;
+        }
+        .main-content {
+          margin-left: 200px;
+        }
+      }
+
       @media (max-width: 768px) {
-        h1 {
-          font-size: 1.8rem;
+        .dashboard {
+          flex-direction: column;
         }
-        button {
-          font-size: 0.9rem;
-          padding: 10px;
+        .sidebar {
+          width: 100%;
+          height: auto;
+          position: static;
         }
-        input {
-          font-size: 0.9rem;
+        .main-content {
+          margin-left: 0;
+        }
+        .stats-grid {
+          grid-template-columns: 1fr;
         }
       }
+
+      .table-wrapper {
+        overflow-x: auto;
+        margin-top: 20px;
+      }
+
       @media (max-width: 480px) {
-        h1 {
-          font-size: 1.5rem;
-        }
-        button {
-          font-size: 0.8rem;
-        }
-        input {
-          font-size: 0.8rem;
+        .detail-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1><i class="fas fa-robot"></i> Autoxing Robot Control Panel</h1>
-      <div class="form-group">
-        <label for="robotId">Robot ID:</label>
-        <input type="text" id="robotId" placeholder="Enter Robot ID" />
-        <button id="connect">
-          <i class="fas fa-link"></i> Connect to Robot
-        </button>
-      </div>
-      <div id="result" class="result"></div>
-      <div id="statisticsResult" class="result"></div>
-      <div id="debug" class="debug">
-        <strong>Debug Logs:</strong>
-        <pre id="debugLogs"></pre>
-      </div>
+    <div class="dashboard">
+      <aside class="sidebar">
+        <div class="logo">
+          <i class="fas fa-robot"></i>
+          Robot Control
+        </div>
+        <ul id="robotList" class="robot-list">
+          <!-- Robot list will be populated here -->
+        </ul>
+      </aside>
+
+      <main class="main-content">
+        <div id="robotDetails" class="robot-details">
+          <!-- Robot details will be shown here -->
+        </div>
+      </main>
     </div>
 
     <script>
       const backendUrl = "http://localhost:3000";
+      let selectedRobotId = null;
 
-      document.getElementById("connect").addEventListener("click", async () => {
-        const robotId = document.getElementById("robotId").value;
-        const resultDiv = document.getElementById("result");
-        const statisticsResultDiv = document.getElementById("statisticsResult");
-        const debugLogs = document.getElementById("debugLogs");
-
-        const logDebug = (message) => {
-          debugLogs.textContent += `${message}\n`;
-        };
-
+      async function loadRobots() {
         try {
-          logDebug("Connecting to robot...");
-          const response = await axios.post(`${backendUrl}/connect`, {
-            robotId,
-          });
+          const response = await axios.get(`${backendUrl}/robots`);
+          const robots = response.data;
+          const robotList = document.getElementById("robotList");
 
-          const { message, currentTask, statistics } = response.data;
+          robotList.innerHTML = robots
+            .map(
+              (robot) => `
+                    <li class="robot-item ${
+                      robot.robotId === selectedRobotId ? "active" : ""
+                    }" 
+                        onclick="selectRobot('${robot.robotId}')">
+                        <i class="fas fa-robot"></i>
+                        Robot ${robot.robotId}
+                        <span class="robot-status ${
+                          robot.status === "Active"
+                            ? "status-active"
+                            : "status-idle"
+                        }"></span>
+                    </li>
+                `
+            )
+            .join("");
 
-          logDebug("Connection successful. Processing data...");
-
-          resultDiv.innerHTML = `<p>${message}</p>`;
-
-          if (currentTask) {
-            logDebug("Current task retrieved successfully.");
-
-            // Define key fields to display
-            const keyFields = {
-              taskId: "Task ID",
-              name: "Task Name",
-              runType: "Run Type",
-              taskType: "Task Type",
-              robotId: "Robot ID",
-              createTime: "Creation Time",
-              isExcute: "Is Executed",
-            };
-
-            // Filter and display key fields
-            const filteredTaskDetails = Object.entries(currentTask)
-              .filter(([key]) => key in keyFields)
-              .map(
-                ([key, value]) =>
-                  `<tr><td>${keyFields[key]}</td><td>${
-                    value || "N/A"
-                  }</td></tr>`
-              )
-              .join("");
-
-            resultDiv.innerHTML += `
-      <h3>Current Task</h3>
-      <table class="result-table">
-        <thead>
-          <tr>
-            <th>Property</th>
-            <th>Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filteredTaskDetails}
-        </tbody>
-      </table>`;
-          } else {
-            logDebug("No current task available.");
-            resultDiv.innerHTML += "<p>No current task available.</p>";
-          }
-
-          if (statistics && statistics.lists) {
-            logDebug("Statistics retrieved successfully.");
-            statisticsResultDiv.innerHTML = `<h3>Statistics</h3>${generateStatisticsListsTable(
-              statistics.lists
-            )}`;
-          } else {
-            statisticsResultDiv.innerHTML = "<p>No Statistics Data Found</p>";
+          // Load details for first robot if none selected
+          if (!selectedRobotId && robots.length > 0) {
+            selectRobot(robots[0].robotId);
           }
         } catch (error) {
-          logDebug("Error occurred during the connection process.");
-          resultDiv.innerHTML = `<p>Error: ${
-            error.message || error.response?.data?.error
-          }</p>`;
+          console.error("Error loading robots:", error);
         }
-      });
-
-      function generateStatisticsListsTable(lists) {
-        if (!lists || !lists.length) return "<p>No statistics available.</p>";
-
-        return `
-  <table class="result-table">
-    <thead>
-      <tr>${Object.keys(lists[0])
-        .map((key) => `<th>${key}</th>`)
-        .join("")}</tr>
-    </thead>
-    <tbody>
-      ${lists
-        .map(
-          (item) =>
-            `<tr>${Object.values(item)
-              .map((val) => `<td>${val || "N/A"}</td>`)
-              .join("")}</tr>`
-        )
-        .join("")}
-    </tbody>
-  </table>`;
       }
+
+      async function selectRobot(robotId) {
+        selectedRobotId = robotId;
+        try {
+          const response = await axios.get(`${backendUrl}/robots/${robotId}`);
+          const robot = response.data;
+          updateRobotDetails(robot);
+
+          // Update active state in sidebar
+          document.querySelectorAll(".robot-item").forEach((item) => {
+            item.classList.remove("active");
+          });
+          document
+            .querySelector(`.robot-item[onclick="selectRobot('${robotId}')"]`)
+            .classList.add("active");
+        } catch (error) {
+          console.error("Error loading robot details:", error);
+        }
+      }
+
+      function updateRobotDetails(robot) {
+        const detailsContainer = document.getElementById("robotDetails");
+
+        const statsHtml = robot.statistics?.lists
+          ? `
+      <h3>Statistics</h3>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Task Count</th>
+              <th>Completed Tasks</th>
+              <th>Total Mileage</th>
+              <th>Task Mileage</th>
+              <th>Low Battery</th>
+              <th>Emergency Count</th>
+              <th>Go Home Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${robot.statistics.lists
+              .map(
+                (stat) => `
+                  <tr>
+                    <td>${stat.date || "N/A"}</td>
+                    <td>${stat.taskCount || 0}</td>
+                    <td>${stat.taskFinishCount || 0}</td>
+                    <td>${stat.mileage || "0 km"}</td>
+                    <td>${stat.taskMileage || "0 km"}</td>
+                    <td>${stat.low20BatCount || 0}</td>
+                    <td>${stat.emergencyCount || 0}</td>
+                    <td>${stat.gohomeCount || 0}</td>
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `
+          : "<p>No statistics available</p>";
+
+        const taskTableHtml = robot.currentTask
+          ? `
+      <h3>Current Task Details</h3>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <tr>
+            <th>Task ID</th>
+            <td>${robot.currentTask.taskId}</td>
+          </tr>
+          <tr>
+            <th>Task Name</th>
+            <td>${robot.currentTask.taskName}</td>
+          </tr>
+          <tr>
+            <th>Created</th>
+            <td>${robot.currentTask.createTime}</td>
+          </tr>
+          <tr>
+            <th>Status</th>
+            <td>${robot.currentTask.isExecuted ? "Executed" : "Pending"}</td>
+          </tr>
+        </table>
+      </div>
+    `
+          : "<p>No active task</p>";
+
+        detailsContainer.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-title">
+        <i class="fas fa-robot"></i>
+        Robot ${robot.robotId}
+      </div>
+      <div>
+        <span class="robot-status ${
+          robot.status === "Active" ? "status-active" : "status-idle"
+        }"></span>
+        ${robot.status}
+      </div>
+    </div>
+    ${statsHtml}
+    ${taskTableHtml}
+  `;
+      }
+
+      // Initial load
+      loadRobots();
+
+      // Refresh data every 30 seconds
+      setInterval(loadRobots, 30000);
     </script>
   </body>
 </html>

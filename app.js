@@ -12,28 +12,40 @@ const {
 const app = express();
 const PORT = 3000;
 
-let axRobot = null;
-let retryInterval = null;
+// Predefined robot IDs
+const predefinedRobots = ["2382310202337BH"];
+
+// Store multiple robot connections
+const robotConnections = new Map();
 
 const configs = {
   appId: "axbaa72440e6274fd6",
   appSecret: "031f0f38f94c441b85bd46a13b7a0171",
-  robotId: "",
-  mode: 1, // 1: Prod, -1: Dev
+  mode: 1,
   globalServicePath: "https://apiglobal.autoxing.com/",
   globalWsPath: "wss://serviceglobal.autoxing.com/",
 };
 
-// Middleware for parsing JSON and enabling CORS
 app.use(express.json());
 app.use(cors());
 
-async function fetchCurrentTask() {
+// Initialize connections for all predefined robots on startup
+async function initializeRobotConnections() {
+  for (const robotId of predefinedRobots) {
+    try {
+      const axRobot = await createRobotConnection(robotId);
+      robotConnections.set(robotId, axRobot);
+      console.log(`Successfully connected to robot: ${robotId}`);
+    } catch (error) {
+      console.error(`Failed to connect to robot ${robotId}:`, error.message);
+    }
+  }
+}
+
+async function fetchCurrentTask(axRobot) {
   try {
     if (axRobot) {
       const task = await axRobot.getCurrentTask();
-      console.log("Fetched Task from SDK:", task);
-
       if (task && task.taskId) {
         return {
           robotId: task.robotId || "N/A",
@@ -44,8 +56,6 @@ async function fetchCurrentTask() {
           taskId: task.taskId || "N/A",
           taskName: task.name || "N/A",
         };
-      } else {
-        console.log("No task found.");
       }
     }
   } catch (e) {
@@ -54,7 +64,7 @@ async function fetchCurrentTask() {
   return null;
 }
 
-async function fetchStatisticsTotal() {
+async function fetchStatisticsTotal(axRobot) {
   try {
     if (axRobot) {
       const statisticsTotal = {
@@ -72,23 +82,22 @@ async function fetchStatisticsTotal() {
       };
 
       const result = await axRobot.getStatisticsTotal(statisticsTotal);
-
-      // Convert distance metrics to kilometers
       if (result && Array.isArray(result.lists)) {
         result.lists = result.lists.map((item) => ({
-          ...item,
-          mileage:
-            item.mileage !== undefined
-              ? (item.mileage / 1000).toFixed(2) + " km"
-              : "N/A",
-          taskMileage:
-            item.taskMileage !== undefined
-              ? (item.taskMileage / 1000).toFixed(2) + " km"
-              : "N/A",
+          date: new Date(item.date).toLocaleDateString(), // Format date
+          taskFinishCount: item.taskFinishCount || 0,
+          taskCount: item.taskCount || 0,
+          mileage: item.mileage
+            ? (item.mileage / 1000).toFixed(2) + " km"
+            : "N/A",
+          taskMileage: item.taskMileage
+            ? (item.taskMileage / 1000).toFixed(2) + " km"
+            : "N/A",
+          low20BatCount: item.low20BatCount || 0,
+          emergencyCount: item.emergencyCount || 0,
+          gohomeCount: item.gohomeCount || 0,
         }));
       }
-
-      console.log("Fetched Statistics:", result);
       return result;
     }
   } catch (e) {
@@ -97,116 +106,89 @@ async function fetchStatisticsTotal() {
   return null;
 }
 
-function startRetryingCurrentTaskAndStatistics(res) {
-  if (retryInterval) clearInterval(retryInterval);
+async function createRobotConnection(robotId) {
+  const { appId, appSecret, mode, globalServicePath, globalWsPath } = configs;
+  let axRobot;
 
-  retryInterval = setInterval(async () => {
-    const currentTask = await fetchCurrentTask();
-    const statistics = await fetchStatisticsTotal();
+  if (mode === 1 || mode === "1") {
+    axRobot = new AXRobotProd(
+      appId,
+      appSecret,
+      AppModeProd.WAN_APP,
+      globalServicePath,
+      globalWsPath
+    );
+  } else if (mode === -1 || mode === "-1") {
+    axRobot = new AXRobotDev(appId, appSecret, AppModeDev.WAN_APP);
+  } else {
+    axRobot = new AXRobotProd(appId, appSecret, AppModeProd.WAN_APP);
+  }
 
-    if (currentTask) {
-      clearInterval(retryInterval);
-      retryInterval = null;
-      console.log("Current Task and Statistics Found:", {
-        currentTask,
-        statistics,
-      });
-      res.json({
-        message: "Current task and statistics found",
-        currentTask,
-        statistics,
-      });
-    } else {
-      console.log("Retrying to fetch current task and statistics...");
-    }
-  }, 3000); // Retry every 3 seconds
+  const isOk = await axRobot.init();
+  if (!isOk) throw new Error("Initialization failed");
+
+  const resData = await axRobot.connectRobot({ robotId });
+  if (resData.errCode !== 0) throw new Error(resData.errMsg);
+
+  return axRobot;
 }
 
-app.post("/init", async (req, res) => {
+// Get all robots data
+app.get("/robots", async (req, res) => {
   try {
-    if (axRobot) axRobot.destroy();
-
-    const { appId, appSecret, mode, globalServicePath, globalWsPath } = configs;
-
-    if (mode === 1 || mode === "1") {
-      axRobot = new AXRobotProd(
-        appId,
-        appSecret,
-        AppModeProd.WAN_APP,
-        globalServicePath,
-        globalWsPath
-      );
-    } else if (mode === -1 || mode === "-1") {
-      axRobot = new AXRobotDev(appId, appSecret, AppModeDev.WAN_APP);
-    } else {
-      axRobot = new AXRobotProd(appId, appSecret, AppModeProd.WAN_APP);
+    const robotsData = [];
+    for (const [robotId, axRobot] of robotConnections) {
+      const currentTask = await fetchCurrentTask(axRobot);
+      const statistics = await fetchStatisticsTotal(axRobot);
+      robotsData.push({
+        robotId,
+        currentTask,
+        statistics,
+        status: currentTask ? "Active" : "Idle",
+      });
     }
-
-    const isOk = await axRobot.init();
-    if (isOk) {
-      const version = axRobot.getVersion();
-      res.json({ message: "Initialization succeeded", sdkVersion: version });
-    } else {
-      res.status(500).json({ message: "Initialization failed" });
-    }
+    res.json(robotsData);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-app.post("/connect", async (req, res) => {
+// Get specific robot data
+app.get("/robots/:robotId", async (req, res) => {
   try {
-    console.log("Connecting with Robot ID:", req.body.robotId);
-    if (axRobot) axRobot.destroy();
+    const { robotId } = req.params;
+    const axRobot = robotConnections.get(robotId);
 
-    const { robotId } = req.body;
-    configs.robotId = robotId;
-
-    const { appId, appSecret, mode, globalServicePath, globalWsPath } = configs;
-    if (mode === 1 || mode === "1") {
-      axRobot = new AXRobotProd(
-        appId,
-        appSecret,
-        AppModeProd.WAN_APP,
-        globalServicePath,
-        globalWsPath
-      );
-    } else if (mode === -1 || mode === "-1") {
-      axRobot = new AXRobotDev(appId, appSecret, AppModeDev.WAN_APP);
-    } else {
-      axRobot = new AXRobotProd(appId, appSecret, AppModeProd.WAN_APP);
+    if (!axRobot) {
+      return res.status(404).json({ error: "Robot not found" });
     }
 
-    const isOk = await axRobot.init();
-    console.log("SDK Initialization Status:", isOk);
-    if (isOk) {
-      const resData = await axRobot.connectRobot({ robotId });
-      console.log("Robot Connection Response:", resData);
-      if (resData.errCode === 0) {
-        startRetryingCurrentTaskAndStatistics(res);
-      } else {
-        res
-          .status(500)
-          .json({ message: "Connection failed", error: resData.errMsg });
-      }
-    } else {
-      res.status(500).json({ message: "Initialization failed" });
-    }
+    const currentTask = await fetchCurrentTask(axRobot);
+    const statistics = await fetchStatisticsTotal(axRobot);
+
+    res.json({
+      robotId,
+      currentTask,
+      statistics,
+      status: currentTask ? "Active" : "Idle",
+    });
   } catch (e) {
-    console.error("Error during connection:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// Server Cleanup
 process.on("SIGINT", () => {
-  if (axRobot) axRobot.destroy();
-  if (retryInterval) clearInterval(retryInterval);
+  for (const axRobot of robotConnections.values()) {
+    axRobot.destroy();
+  }
   console.log("Server shutting down...");
   process.exit();
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// Initialize connections and start server
+initializeRobotConnections().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log("Connected robots:", Array.from(robotConnections.keys()));
+  });
 });
