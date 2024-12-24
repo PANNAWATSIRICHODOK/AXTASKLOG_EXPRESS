@@ -28,65 +28,99 @@ const configs = {
 app.use(express.json());
 app.use(cors());
 
-// Utility functions
-function runTypeDescription(runType) {
-  const descriptions = {
-    0: "Timed Disinfecting",
-    1: "Temporary Disinfecting",
-    20: "Fast Meal Delivery",
-    21: "Multi-Point Meal Delivery",
-    22: "Leading",
-    23: "Cruising",
-    24: "Returning",
-    25: "Returning to Pile Charging",
-  };
-  return descriptions[runType] || "Unknown";
-}
-
-function taskTypeDescription(taskType) {
-  const descriptions = {
-    0: "Disinfect",
-    1: "Recharge Pile",
-    2: "Restaurant",
-  };
-  return descriptions[taskType] || "Unknown";
-}
-
 async function fetchCurrentTask() {
   try {
     if (axRobot) {
       const task = await axRobot.getCurrentTask();
+      console.log("Fetched Task from SDK:", task);
+
       if (task && task.taskId) {
-        console.log("Current Task:", task);
-        stopRetryingTask(); // หยุดดึงข้อมูลเมื่อเจอ Task
-        return task; // ส่งกลับ Task ที่พบ
+        return {
+          robotId: task.robotId || "N/A",
+          isExecuted: task.isExcute || false,
+          createTime: task.createTime
+            ? new Date(task.createTime).toLocaleString()
+            : "N/A",
+          taskId: task.taskId || "N/A",
+          taskName: task.name || "N/A",
+        };
       } else {
-        console.log("No current task found. Retrying...");
+        console.log("No task found.");
       }
     }
   } catch (e) {
-    console.error("Failed to fetch current task:", e);
+    console.error("Error fetching current task:", e);
   }
+  return null;
 }
 
-function startRetryingTask() {
-  stopRetryingTask(); // เคลียร์ Interval เดิมถ้ามี
-  retryInterval = setInterval(async () => {
-    const task = await fetchCurrentTask();
-    if (task) {
-      console.log("Task Found:", task);
+async function fetchStatisticsTotal() {
+  try {
+    if (axRobot) {
+      const statisticsTotal = {
+        startTime: Date.now() - 86400000 * 31, // 31 days ago
+        endTime: Date.now(),
+        dataItems: [
+          "taskFinishCount",
+          "taskMileage",
+          "taskCount",
+          "mileage",
+          "low20BatCount",
+          "emergencyCount",
+          "gohomeCount",
+        ],
+      };
+
+      const result = await axRobot.getStatisticsTotal(statisticsTotal);
+
+      // Convert distance metrics to kilometers
+      if (result && Array.isArray(result.lists)) {
+        result.lists = result.lists.map((item) => ({
+          ...item,
+          mileage:
+            item.mileage !== undefined
+              ? (item.mileage / 1000).toFixed(2) + " km"
+              : "N/A",
+          taskMileage:
+            item.taskMileage !== undefined
+              ? (item.taskMileage / 1000).toFixed(2) + " km"
+              : "N/A",
+        }));
+      }
+
+      console.log("Fetched Statistics:", result);
+      return result;
     }
-  }, 3000); // ดึงข้อมูลทุก 3 วินาที
-}
-
-function stopRetryingTask() {
-  if (retryInterval) {
-    clearInterval(retryInterval);
-    retryInterval = null;
+  } catch (e) {
+    console.error("Error fetching statistics total:", e);
   }
+  return null;
 }
 
-// API Endpoints
+function startRetryingCurrentTaskAndStatistics(res) {
+  if (retryInterval) clearInterval(retryInterval);
+
+  retryInterval = setInterval(async () => {
+    const currentTask = await fetchCurrentTask();
+    const statistics = await fetchStatisticsTotal();
+
+    if (currentTask) {
+      clearInterval(retryInterval);
+      retryInterval = null;
+      console.log("Current Task and Statistics Found:", {
+        currentTask,
+        statistics,
+      });
+      res.json({
+        message: "Current task and statistics found",
+        currentTask,
+        statistics,
+      });
+    } else {
+      console.log("Retrying to fetch current task and statistics...");
+    }
+  }, 3000); // Retry every 3 seconds
+}
 
 app.post("/init", async (req, res) => {
   try {
@@ -122,6 +156,7 @@ app.post("/init", async (req, res) => {
 
 app.post("/connect", async (req, res) => {
   try {
+    console.log("Connecting with Robot ID:", req.body.robotId);
     if (axRobot) axRobot.destroy();
 
     const { robotId } = req.body;
@@ -143,11 +178,12 @@ app.post("/connect", async (req, res) => {
     }
 
     const isOk = await axRobot.init();
+    console.log("SDK Initialization Status:", isOk);
     if (isOk) {
       const resData = await axRobot.connectRobot({ robotId });
+      console.log("Robot Connection Response:", resData);
       if (resData.errCode === 0) {
-        startRetryingTask();
-        res.json({ message: "Connection succeeded", robotId: resData.robotId });
+        startRetryingCurrentTaskAndStatistics(res);
       } else {
         res
           .status(500)
@@ -157,151 +193,15 @@ app.post("/connect", async (req, res) => {
       res.status(500).json({ message: "Initialization failed" });
     }
   } catch (e) {
+    console.error("Error during connection:", e);
     res.status(500).json({ error: e.message });
-  }
-});
-
-app.get("/current-task", async (req, res) => {
-  try {
-    if (!axRobot)
-      return res
-        .status(400)
-        .json({ message: "SDK not initialized. Call /init first." });
-
-    const task = await axRobot.getCurrentTask();
-    if (task && task.taskId) {
-      // คำนวณเวลาที่ใช้ใน Task
-      const currentTime = Date.now();
-      const taskTime = task.createTime
-        ? `${Math.floor((currentTime - task.createTime) / 1000)} seconds`
-        : "N/A";
-
-      // คำนวณระยะทางรวมจาก taskPts
-      const totalDistance = calculateTotalDistance(task.taskPts || []);
-
-      res.json({
-        taskId: task.taskId,
-        taskName: task.name || "Unnamed Task",
-        robotId: task.robotId,
-        taskType: taskTypeDescription(task.taskType),
-        runType: runTypeDescription(task.runType),
-        isCancel: task.isCancel,
-        isFinish: task.isFinish,
-        totalDistance: `${totalDistance.toFixed(2)} meters`,
-        taskDuration: taskTime,
-      });
-    } else {
-      res.status(404).json({ message: "No current task found." });
-    }
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ฟังก์ชันคำนวณระยะทางรวม
-function calculateTotalDistance(taskPts) {
-  if (!Array.isArray(taskPts) || taskPts.length < 2) return 0;
-
-  let totalDistance = 0;
-  for (let i = 0; i < taskPts.length - 1; i++) {
-    const pt1 = taskPts[i];
-    const pt2 = taskPts[i + 1];
-    const distance = Math.sqrt(
-      Math.pow(pt2.x - pt1.x, 2) + Math.pow(pt2.y - pt1.y, 2)
-    );
-    totalDistance += distance;
-  }
-  return totalDistance;
-}
-
-app.get("/task-statistics", async (req, res) => {
-  try {
-    if (!axRobot) {
-      return res.status(400).json({
-        message: "SDK not initialized. Call /init first.",
-      });
-    }
-
-    const taskId = req.query.taskId;
-    const fields = Array.isArray(req.query.fields)
-      ? req.query.fields
-      : req.query.fields
-      ? req.query.fields.split(",")
-      : [
-          "cStartTime",
-          "cEndTime",
-          "mileage",
-          "disinfect",
-          "taskCancelCount",
-          "errCount",
-          "taskFinishCount",
-          "taskPauseCount",
-        ];
-
-    const validFields = [
-      "cStartTime",
-      "cEndTime",
-      "mileage",
-      "disinfect",
-      "taskCancelCount",
-      "errCount",
-      "taskFinishCount",
-      "taskPauseCount",
-    ];
-
-    const invalidFields = fields.filter(
-      (field) => !validFields.includes(field)
-    );
-
-    if (!taskId) {
-      return res.status(400).json({
-        message: "Missing required parameter: taskId",
-      });
-    }
-
-    if (invalidFields.length > 0) {
-      return res.status(400).json({
-        message: `Invalid fields provided: ${invalidFields.join(", ")}`,
-      });
-    }
-
-    const taskStatistics = { taskId, fields };
-
-    console.log("Task Statistics Parameters:", taskStatistics);
-
-    try {
-      const result = await axRobot.getTaskStatistics(taskStatistics);
-
-      console.log("Task Statistics Result (Logged):", result);
-
-      if (!result || Object.keys(result).length === 0) {
-        console.log("Debug: No statistics found for:", taskStatistics);
-        return res.status(404).json({
-          message: "No statistics data found for the given parameters.",
-        });
-      }
-
-      res.json({ statistics: result });
-    } catch (sdkError) {
-      console.error("SDK Error fetching task statistics:", sdkError);
-      return res.status(500).json({
-        message: "Error fetching task statistics from SDK",
-        error: sdkError.message || sdkError,
-      });
-    }
-  } catch (e) {
-    console.error("Error fetching task statistics:", e);
-    res.status(500).json({
-      error: e.message,
-      message: "An error occurred while fetching task statistics.",
-    });
   }
 });
 
 // Server Cleanup
 process.on("SIGINT", () => {
   if (axRobot) axRobot.destroy();
-  stopRetryingTask();
+  if (retryInterval) clearInterval(retryInterval);
   console.log("Server shutting down...");
   process.exit();
 });

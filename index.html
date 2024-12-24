@@ -5,235 +5,250 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Autoxing Robot Control</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+      rel="stylesheet"
+    />
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-      }
       .container {
-        max-width: 600px;
-        margin: auto;
+        background: #f9f9f9;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        width: auto;
+        padding: 30px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 20px;
+        color: #1a73e8;
+        font-family: "Roboto", sans-serif;
+        text-align: left;
       }
       .form-group {
-        margin-bottom: 15px;
+        text-align: left;
+        margin-bottom: 20px;
+      }
+      .form-group input {
+        width: 500px;
       }
       label {
-        display: block;
-        margin-bottom: 5px;
+        width: 20px;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #333;
+        font-family: "Roboto", sans-serif;
       }
-      input,
-      button {
+      input {
         width: 100%;
         padding: 10px;
-        margin-top: 5px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: #fff;
+        color: #333;
+        font-size: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        font-family: "Roboto", sans-serif;
+      }
+      button {
+        padding: 12px;
+        margin-top: 10px;
+        font-size: 1rem;
+        font-weight: bold;
+        background: #1a73e8;
+        border: none;
+        border-radius: 5px;
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-family: "Roboto", sans-serif;
+      }
+      button:hover {
+        background: #0056b3;
+        box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+      }
+      .result,
+      .debug {
+        text-align: left;
+        font-size: 1rem;
+        padding: 15px;
+        color: #333;
+        overflow-x: auto;
+        font-family: "Roboto", sans-serif;
       }
       .result-table {
         margin-top: 20px;
         border-collapse: collapse;
         width: 100%;
+        overflow-x: auto;
       }
       .result-table th,
       .result-table td {
-        border: 1px solid #ccc;
-        padding: 8px;
+        border: 1px solid #ddd;
+        padding: 12px;
         text-align: left;
+        font-size: 1rem;
       }
       .result-table th {
-        background-color: #f4f4f4;
+        background-color: #1a73e8;
+        color: #fff;
       }
-      .result-table tr:nth-child(even) {
-        background-color: #f9f9f9;
+      .debug {
+        background: #f5f5f5;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-top: 20px;
+        overflow-y: auto;
+        max-height: 200px;
+      }
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 1.8rem;
+        }
+        button {
+          font-size: 0.9rem;
+          padding: 10px;
+        }
+        input {
+          font-size: 0.9rem;
+        }
+      }
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 1.5rem;
+        }
+        button {
+          font-size: 0.8rem;
+        }
+        input {
+          font-size: 0.8rem;
+        }
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Autoxing Robot Control Panel</h1>
-
+      <h1><i class="fas fa-robot"></i> Autoxing Robot Control Panel</h1>
       <div class="form-group">
         <label for="robotId">Robot ID:</label>
         <input type="text" id="robotId" placeholder="Enter Robot ID" />
+        <button id="connect">
+          <i class="fas fa-link"></i> Connect to Robot
+        </button>
       </div>
-
-      <div class="form-group">
-        <button id="initialize">Initialize SDK</button>
+      <div id="result" class="result"></div>
+      <div id="statisticsResult" class="result"></div>
+      <div id="debug" class="debug">
+        <strong>Debug Logs:</strong>
+        <pre id="debugLogs"></pre>
       </div>
-
-      <div class="form-group">
-        <button id="connect">Connect to Robot</button>
-      </div>
-
-      <div class="form-group">
-        <button id="fetchTask">Fetch Current Task</button>
-      </div>
-
-      <div class="form-group">
-        <button id="fetchStatistics">Fetch Task Statistics</button>
-      </div>
-
-      <div class="result" id="result"></div>
-      <div class="result" id="statisticsResult"></div>
     </div>
 
     <script>
-      const backendUrl = "http://localhost:3000"; // URL ของ Express Backend
-      const resultDiv = document.getElementById("result");
-
-      document
-        .getElementById("initialize")
-        .addEventListener("click", async () => {
-          try {
-            const response = await axios.post(`${backendUrl}/init`);
-            resultDiv.innerHTML = `<p>${
-              response.data.message || "SDK Initialized!"
-            }</p>`;
-          } catch (error) {
-            resultDiv.innerHTML = `<p>Error: ${
-              error.response?.data?.error || error.message
-            }</p>`;
-          }
-        });
+      const backendUrl = "http://localhost:3000";
 
       document.getElementById("connect").addEventListener("click", async () => {
         const robotId = document.getElementById("robotId").value;
+        const resultDiv = document.getElementById("result");
+        const statisticsResultDiv = document.getElementById("statisticsResult");
+        const debugLogs = document.getElementById("debugLogs");
+
+        const logDebug = (message) => {
+          debugLogs.textContent += `${message}\n`;
+        };
 
         try {
+          logDebug("Connecting to robot...");
           const response = await axios.post(`${backendUrl}/connect`, {
             robotId,
           });
-          resultDiv.innerHTML = `<p>${
-            response.data.message || "Connected to Robot!"
-          }</p>`;
+
+          const { message, currentTask, statistics } = response.data;
+
+          logDebug("Connection successful. Processing data...");
+
+          resultDiv.innerHTML = `<p>${message}</p>`;
+
+          if (currentTask) {
+            logDebug("Current task retrieved successfully.");
+
+            // Define key fields to display
+            const keyFields = {
+              taskId: "Task ID",
+              name: "Task Name",
+              runType: "Run Type",
+              taskType: "Task Type",
+              robotId: "Robot ID",
+              createTime: "Creation Time",
+              isExcute: "Is Executed",
+            };
+
+            // Filter and display key fields
+            const filteredTaskDetails = Object.entries(currentTask)
+              .filter(([key]) => key in keyFields)
+              .map(
+                ([key, value]) =>
+                  `<tr><td>${keyFields[key]}</td><td>${
+                    value || "N/A"
+                  }</td></tr>`
+              )
+              .join("");
+
+            resultDiv.innerHTML += `
+      <h3>Current Task</h3>
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredTaskDetails}
+        </tbody>
+      </table>`;
+          } else {
+            logDebug("No current task available.");
+            resultDiv.innerHTML += "<p>No current task available.</p>";
+          }
+
+          if (statistics && statistics.lists) {
+            logDebug("Statistics retrieved successfully.");
+            statisticsResultDiv.innerHTML = `<h3>Statistics</h3>${generateStatisticsListsTable(
+              statistics.lists
+            )}`;
+          } else {
+            statisticsResultDiv.innerHTML = "<p>No Statistics Data Found</p>";
+          }
         } catch (error) {
+          logDebug("Error occurred during the connection process.");
           resultDiv.innerHTML = `<p>Error: ${
-            error.response?.data?.error || error.message
+            error.message || error.response?.data?.error
           }</p>`;
         }
       });
 
-      document
-        .getElementById("fetchTask")
-        .addEventListener("click", async () => {
-          try {
-            const response = await axios.get(`${backendUrl}/current-task`);
-            const taskData = response.data;
+      function generateStatisticsListsTable(lists) {
+        if (!lists || !lists.length) return "<p>No statistics available.</p>";
 
-            if (taskData) {
-              resultDiv.innerHTML = generateTaskDetailsTable(taskData);
-            } else {
-              resultDiv.innerHTML = "<p>No Task Found</p>";
-            }
-          } catch (error) {
-            resultDiv.innerHTML = `<p>Error: ${
-              error.response?.data?.error || error.message
-            }</p>`;
-          }
-        });
-
-      // ฟังก์ชันแสดงรายละเอียด Task เป็นตาราง
-      function generateTaskDetailsTable(data) {
         return `
-            <table class="result-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Task ID</td>
-                  <td>${data.taskId}</td>
-                </tr>
-                <tr>
-                  <td>Task Name</td>
-                  <td>${data.taskName || "Unnamed Task"}</td>
-                </tr>
-                <tr>
-                  <td>Robot ID</td>
-                  <td>${data.robotId}</td>
-                </tr>
-                <tr>
-                  <td>Task Type</td>
-                  <td>${data.taskType}</td>
-                </tr>
-                <tr>
-                  <td>Run Type</td>
-                  <td>${data.runType}</td>
-                </tr>
-                <tr>
-                  <td>Is Cancelled</td>
-                  <td>${data.isCancel ? "Yes" : "No"}</td>
-                </tr>
-                <tr>
-                  <td>Is Finished</td>
-                  <td>${data.isFinish ? "Yes" : "No"}</td>
-                </tr>
-                <tr>
-                  <td>Total Distance</td>
-                  <td>${data.totalDistance}</td>
-                </tr>
-                <tr>
-                  <td>Task Duration</td>
-                  <td>${data.taskDuration}</td>
-                </tr>
-              </tbody>
-            </table>`;
-      }
-
-      document
-        .getElementById("fetchStatistics")
-        .addEventListener("click", async () => {
-          const statisticsResultDiv =
-            document.getElementById("statisticsResult");
-          try {
-            const response = await axios.get(`${backendUrl}/task-statistics`, {
-              params: {
-                taskId: "98914edb-ff80-4c7a-af33-3582d465a76a",
-                fields: [
-                  "cStartTime",
-                  "cEndTime",
-                  "mileage",
-                  "disinfect",
-                  "taskCancelCount",
-                  "errCount",
-                  "taskFinishCount",
-                  "taskPauseCount",
-                ],
-              },
-            });
-
-            const statisticsData = response.data.statistics;
-
-            if (statisticsData) {
-              statisticsResultDiv.innerHTML =
-                generateStatisticsTable(statisticsData);
-            } else {
-              statisticsResultDiv.innerHTML = "<p>No Statistics Data Found</p>";
-            }
-          } catch (error) {
-            statisticsResultDiv.innerHTML = `<p>Error: ${
-              error.response?.data?.message || error.message
-            }</p>`;
-          }
-        });
-
-      // ฟังก์ชันสร้างตารางสำหรับข้อมูล Statistics
-      function generateStatisticsTable(data) {
-        return `
-    <table class="result-table">
-      <thead>
-        <tr>
-          <th>Field</th>
-          <th>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${Object.entries(data)
-          .map(([key, value]) => `<tr><td>${key}</td><td>${value}</td></tr>`)
-          .join("")}
-      </tbody>
-    </table>`;
+  <table class="result-table">
+    <thead>
+      <tr>${Object.keys(lists[0])
+        .map((key) => `<th>${key}</th>`)
+        .join("")}</tr>
+    </thead>
+    <tbody>
+      ${lists
+        .map(
+          (item) =>
+            `<tr>${Object.values(item)
+              .map((val) => `<td>${val || "N/A"}</td>`)
+              .join("")}</tr>`
+        )
+        .join("")}
+    </tbody>
+  </table>`;
       }
     </script>
   </body>
