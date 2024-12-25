@@ -210,13 +210,13 @@
           Robot Control
         </div>
         <ul id="robotList" class="robot-list">
-          <!-- Robot list will be populated here -->
+          <p id="noRobotsMessage">Loading robots...</p>
         </ul>
       </aside>
 
       <main class="main-content">
         <div id="robotDetails" class="robot-details">
-          <!-- Robot details will be shown here -->
+          <p id="detailsPlaceholder">Select a robot to view details.</p>
         </div>
       </main>
     </div>
@@ -230,14 +230,23 @@
           const response = await axios.get(`${backendUrl}/robots`);
           const robots = response.data;
           const robotList = document.getElementById("robotList");
+          const noRobotsMessage = document.getElementById("noRobotsMessage");
 
+          if (robots.length === 0) {
+            robotList.innerHTML = "<p>No robots available</p>";
+            document.getElementById("robotDetails").innerHTML =
+              "<p>Select a robot to view details</p>";
+            return;
+          }
+
+          noRobotsMessage && noRobotsMessage.remove();
           robotList.innerHTML = robots
             .map(
               (robot) => `
                     <li class="robot-item ${
                       robot.robotId === selectedRobotId ? "active" : ""
                     }" 
-                        onclick="selectRobot('${robot.robotId}')">
+                        data-robot-id="${robot.robotId}">
                         <i class="fas fa-robot"></i>
                         Robot ${robot.robotId}
                         <span class="robot-status ${
@@ -250,12 +259,20 @@
             )
             .join("");
 
-          // Load details for first robot if none selected
+          // Add click listeners
+          document.querySelectorAll(".robot-item").forEach((item) => {
+            item.addEventListener("click", () => {
+              selectRobot(item.dataset.robotId);
+            });
+          });
+
           if (!selectedRobotId && robots.length > 0) {
             selectRobot(robots[0].robotId);
           }
         } catch (error) {
           console.error("Error loading robots:", error);
+          document.getElementById("robotList").innerHTML =
+            "<p>Error loading robots. Please try again later.</p>";
         }
       }
 
@@ -271,7 +288,7 @@
             item.classList.remove("active");
           });
           document
-            .querySelector(`.robot-item[onclick="selectRobot('${robotId}')"]`)
+            .querySelector(`.robot-item[data-robot-id="${robotId}"]`)
             .classList.add("active");
         } catch (error) {
           console.error("Error loading robot details:", error);
@@ -281,45 +298,35 @@
       function updateRobotDetails(robot) {
         const detailsContainer = document.getElementById("robotDetails");
 
-        const statsHtml = robot.statistics?.lists
+        const statsHtml = robot.singleTaskStatistics
           ? `
-      <h3>Statistics</h3>
+      <h3>Single Task Statistics</h3>
       <div class="table-wrapper">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Task Count</th>
-              <th>Completed Tasks</th>
-              <th>Total Mileage</th>
-              <th>Task Mileage</th>
-              <th>Low Battery</th>
-              <th>Emergency Count</th>
-              <th>Go Home Count</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Mileage</th>
+              <th>Task Finish Count</th>
+              <th>Task Pause Count</th>
+              <th>Task Cancel Count</th>
             </tr>
           </thead>
           <tbody>
-            ${robot.statistics.lists
-              .map(
-                (stat) => `
-                  <tr>
-                    <td>${stat.date || "N/A"}</td>
-                    <td>${stat.taskCount || 0}</td>
-                    <td>${stat.taskFinishCount || 0}</td>
-                    <td>${stat.mileage || "0 km"}</td>
-                    <td>${stat.taskMileage || "0 km"}</td>
-                    <td>${stat.low20BatCount || 0}</td>
-                    <td>${stat.emergencyCount || 0}</td>
-                    <td>${stat.gohomeCount || 0}</td>
-                  </tr>
-                `
-              )
-              .join("")}
+            <tr>
+              <td>${robot.singleTaskStatistics.cStartTime || "N/A"}</td>
+              <td>${robot.singleTaskStatistics.cEndTime || "N/A"}</td>
+              <td>${robot.singleTaskStatistics.mileage || "0 km"}</td>
+              <td>${robot.singleTaskStatistics.taskFinishCount || 0}</td>
+              <td>${robot.singleTaskStatistics.taskPauseCount || 0}</td>
+              <td>${robot.singleTaskStatistics.taskCancelCount || 0}</td>
+            </tr>
           </tbody>
         </table>
       </div>
     `
-          : "<p>No statistics available</p>";
+          : "<p>No single task statistics available</p>";
 
         const taskTableHtml = robot.currentTask
           ? `
@@ -360,15 +367,12 @@
         ${robot.status}
       </div>
     </div>
-    ${statsHtml}
     ${taskTableHtml}
+    ${statsHtml}
   `;
       }
 
-      // Initial load
       loadRobots();
-
-      // Refresh data every 30 seconds
       setInterval(loadRobots, 30000);
     </script>
   </body>

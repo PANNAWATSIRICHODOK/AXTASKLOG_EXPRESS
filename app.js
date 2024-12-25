@@ -12,10 +12,7 @@ const {
 const app = express();
 const PORT = 3000;
 
-// Predefined robot IDs
-const predefinedRobots = ["2382310202337BH"];
-
-// Store multiple robot connections
+const predefinedRobots = ["2382310202332BC", "2382310202337BH"];
 const robotConnections = new Map();
 
 const configs = {
@@ -29,81 +26,64 @@ const configs = {
 app.use(express.json());
 app.use(cors());
 
-// Initialize connections for all predefined robots on startup
 async function initializeRobotConnections() {
   for (const robotId of predefinedRobots) {
     try {
+      console.log(`Connecting to robot: ${robotId}`);
       const axRobot = await createRobotConnection(robotId);
       robotConnections.set(robotId, axRobot);
       console.log(`Successfully connected to robot: ${robotId}`);
     } catch (error) {
-      console.error(`Failed to connect to robot ${robotId}:`, error.message);
+      console.error(`Failed to connect to robot ${robotId}: ${error.message}`);
     }
   }
 }
 
 async function fetchCurrentTask(axRobot) {
   try {
-    if (axRobot) {
-      const task = await axRobot.getCurrentTask();
-      if (task && task.taskId) {
-        return {
-          robotId: task.robotId || "N/A",
-          isExecuted: task.isExcute || false,
-          createTime: task.createTime
-            ? new Date(task.createTime).toLocaleString()
-            : "N/A",
-          taskId: task.taskId || "N/A",
-          taskName: task.name || "N/A",
-        };
-      }
-    }
-  } catch (e) {
-    console.error("Error fetching current task:", e);
+    const task = await axRobot.getCurrentTask();
+    return task || null;
+  } catch (error) {
+    console.error("Error fetching current task:", error.message);
+    return null;
   }
-  return null;
 }
 
-async function fetchStatisticsTotal(axRobot) {
+async function fetchSingleTaskStatistics(axRobot, taskId) {
   try {
-    if (axRobot) {
-      const statisticsTotal = {
-        startTime: Date.now() - 86400000 * 31, // 31 days ago
-        endTime: Date.now(),
-        dataItems: [
-          "taskFinishCount",
-          "taskMileage",
-          "taskCount",
-          "mileage",
-          "low20BatCount",
-          "emergencyCount",
-          "gohomeCount",
-        ],
-      };
-
-      const result = await axRobot.getStatisticsTotal(statisticsTotal);
-      if (result && Array.isArray(result.lists)) {
-        result.lists = result.lists.map((item) => ({
-          date: new Date(item.date).toLocaleDateString(), // Format date
-          taskFinishCount: item.taskFinishCount || 0,
-          taskCount: item.taskCount || 0,
-          mileage: item.mileage
-            ? (item.mileage / 1000).toFixed(2) + " km"
-            : "N/A",
-          taskMileage: item.taskMileage
-            ? (item.taskMileage / 1000).toFixed(2) + " km"
-            : "N/A",
-          low20BatCount: item.low20BatCount || 0,
-          emergencyCount: item.emergencyCount || 0,
-          gohomeCount: item.gohomeCount || 0,
-        }));
-      }
-      return result;
-    }
-  } catch (e) {
-    console.error("Error fetching statistics total:", e);
+    if (!taskId) return null;
+    const singleTaskStatistics = {
+      taskId,
+      fields: [
+        "cStartTime",
+        "cEndTime",
+        "mileage",
+        "disinfect",
+        "taskFinishCount",
+        "taskPauseCount",
+        "taskCancelCount",
+      ],
+    };
+    const result = await axRobot.getSingleTaskStatistics(singleTaskStatistics);
+    return {
+      cStartTime: result.cStartTime
+        ? new Date(result.cStartTime).toLocaleString()
+        : "N/A",
+      cEndTime: result.cEndTime
+        ? new Date(result.cEndTime).toLocaleString()
+        : "N/A",
+      mileage: result.mileage
+        ? `${(result.mileage / 1000).toFixed(2)} km`
+        : "N/A",
+      disinfect: result.disinfect || 0,
+      taskFinishCount: result.taskFinishCount || 0,
+      taskPauseCount: result.taskPauseCount || 0,
+      taskCancelCount: result.taskCancelCount || 0,
+    };
+  } catch (error) {
+    console.error("Error fetching single task statistics:", error.message);
+    return null;
   }
-  return null;
 }
 
 async function createRobotConnection(robotId) {
@@ -133,27 +113,27 @@ async function createRobotConnection(robotId) {
   return axRobot;
 }
 
-// Get all robots data
 app.get("/robots", async (req, res) => {
   try {
     const robotsData = [];
     for (const [robotId, axRobot] of robotConnections) {
       const currentTask = await fetchCurrentTask(axRobot);
-      const statistics = await fetchStatisticsTotal(axRobot);
+      const singleTaskStatistics =
+        currentTask?.taskId &&
+        (await fetchSingleTaskStatistics(axRobot, currentTask.taskId));
       robotsData.push({
         robotId,
         currentTask,
-        statistics,
+        singleTaskStatistics,
         status: currentTask ? "Active" : "Idle",
       });
     }
     res.json(robotsData);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get specific robot data
 app.get("/robots/:robotId", async (req, res) => {
   try {
     const { robotId } = req.params;
@@ -164,16 +144,18 @@ app.get("/robots/:robotId", async (req, res) => {
     }
 
     const currentTask = await fetchCurrentTask(axRobot);
-    const statistics = await fetchStatisticsTotal(axRobot);
+    const singleTaskStatistics =
+      currentTask?.taskId &&
+      (await fetchSingleTaskStatistics(axRobot, currentTask.taskId));
 
     res.json({
       robotId,
       currentTask,
-      statistics,
+      singleTaskStatistics,
       status: currentTask ? "Active" : "Idle",
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -185,7 +167,6 @@ process.on("SIGINT", () => {
   process.exit();
 });
 
-// Initialize connections and start server
 initializeRobotConnections().then(() => {
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
