@@ -132,25 +132,43 @@ class RobotManager {
     this.config = config;
     this.database = database;
     this.connections = new Map();
+    this.retryIntervals = new Map();
   }
 
   async initialize() {
-    const connectPromises = this.config.robots.predefinedIds.map(
-      async (robotId) => {
-        try {
-          console.log(`Connecting to robot: ${robotId}`);
-          const axRobot = await this.createConnection(robotId);
-          this.connections.set(robotId, axRobot);
-          console.log(`Successfully connected to robot: ${robotId}`);
-        } catch (error) {
-          console.error(`Failed to connect to robot ${robotId}:`, error);
-          this.connections.set(robotId, null); // Mark as offline
-        }
-      }
-    );
+    for (const robotId of this.config.robots.predefinedIds) {
+      this.connectRobot(robotId); // Start connecting each robot
+    }
+    console.log("Robot initialization started.");
+  }
 
-    await Promise.allSettled(connectPromises);
-    console.log("Robot initialization completed.");
+  async connectRobot(robotId) {
+    try {
+      console.log(`Attempting to connect to robot: ${robotId}`);
+      const axRobot = await this.createConnection(robotId);
+      this.connections.set(robotId, axRobot);
+      console.log(`Successfully connected to robot: ${robotId}`);
+
+      // Clear retry interval if previously set
+      if (this.retryIntervals.has(robotId)) {
+        clearInterval(this.retryIntervals.get(robotId));
+        this.retryIntervals.delete(robotId);
+      }
+    } catch (error) {
+      console.error(`Failed to connect to robot ${robotId}:`, error);
+
+      // Schedule reconnection attempts
+      if (!this.retryIntervals.has(robotId)) {
+        const retryInterval = setInterval(() => {
+          console.log(`Retrying connection for robot: ${robotId}`);
+          this.connectRobot(robotId);
+        }, 10000); // Retry every 10 seconds
+        this.retryIntervals.set(robotId, retryInterval);
+      }
+
+      // Mark as offline for now
+      this.connections.set(robotId, null);
+    }
   }
 
   async createConnection(robotId) {
@@ -177,7 +195,7 @@ class RobotManager {
     return axRobot;
   }
 
-  async fetchRobotData(robotId) {
+  fetchRobotData = async (robotId) => {
     const axRobot = this.connections.get(robotId);
 
     if (!axRobot) {
@@ -211,18 +229,18 @@ class RobotManager {
         singleTaskStatistics: {},
       };
     }
-  }
+  };
 
-  async fetchCurrentTask(axRobot) {
+  fetchCurrentTask = async (axRobot) => {
     try {
       return (await axRobot.getCurrentTask()) || null;
     } catch (error) {
       console.error("Error fetching current task:", error);
       return null;
     }
-  }
+  };
 
-  async fetchTaskStatistics(axRobot, taskId) {
+  fetchTaskStatistics = async (axRobot, taskId) => {
     try {
       const result = await axRobot.getSingleTaskStatistics({
         taskId,
@@ -256,7 +274,7 @@ class RobotManager {
       console.error("Error fetching task statistics:", error);
       return null;
     }
-  }
+  };
 
   async fetchTaskStatisticsInfo(startTime, endTime, type = -1) {
     const taskStatistics = [];
@@ -287,6 +305,10 @@ class RobotManager {
       if (axRobot) axRobot.destroy();
     }
     console.log("All robot connections destroyed.");
+    for (const retryInterval of this.retryIntervals.values()) {
+      clearInterval(retryInterval);
+    }
+    console.log("All retry intervals cleared.");
   }
 }
 

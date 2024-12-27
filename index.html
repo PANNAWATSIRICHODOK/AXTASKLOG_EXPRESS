@@ -141,8 +141,21 @@
         color: white;
       }
 
+      .status-offline {
+        background: linear-gradient(
+          135deg,
+          #f59e0b 0%,
+          #d97706 100%
+        ); /* Orange for Idle */
+        color: white;
+      }
+
       .status-inactive {
-        background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+        background: linear-gradient(
+          135deg,
+          #f87171 0%,
+          #ef4444 100%
+        ); /* Red for Offline */
         color: white;
       }
 
@@ -402,9 +415,9 @@
               <th>Robot ID</th>
               <th>Status</th>
               <th>Task ID</th>
-              <th>Current Task</th>
               <th>Start Time</th>
               <th>End Time</th>
+              <th>Current Task Statistics</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -511,9 +524,10 @@
 
       // Load robots and update the table
       async function loadRobots() {
+        const robotTableBody = document.getElementById("robotTableBody");
         robotTableBody.innerHTML = `
     <tr>
-      <td colspan="8" class="loader">
+      <td colspan="7" class="loader">
         <span>Loading robots...</span>
       </td>
     </tr>`;
@@ -524,56 +538,63 @@
 
           if (robots.length === 0) {
             robotTableBody.innerHTML = `
-        <tr><td colspan="8" style="text-align: center;">No robots available</td></tr>`;
+            <tr><td colspan="7" style="text-align: center;">No robots available</td></tr>`;
             return;
           }
 
           const robotRowsHtml = robots
             .map(
               (robot) => `
-      <tr>
-        <td>${robot.robotId || "N/A"}</td>
-        <td>
-          <span class="status-badge ${
-            robot.status === "Active"
-              ? "status-active"
-              : robot.status === "Inactive"
-              ? "status-inactive"
-              : "status-offline"
-          }">${robot.status || "Unknown"}</span>
-        </td>
-        <td>${robot.currentTask?.taskId || "N/A"}</td>
-        <td>${robot.currentTask?.name || "No Task"}</td>
-        <td>${
-          robot.singleTaskStatistics?.cStartTime
-            ? formatThaiDate(robot.singleTaskStatistics.cStartTime)
-            : "N/A"
-        }</td>
-        <td>${
-          robot.singleTaskStatistics?.cEndTime
-            ? formatThaiDate(robot.singleTaskStatistics.cEndTime)
-            : "N/A"
-        }</td>
-        <td>
-          <button class="btn-details" onclick="showRobotDetails('${
-            robot.robotId
-          }')">More Details</button>
-        </td>
-      </tr>`
+        <tr>
+          <td>${robot.robotId || "N/A"}</td>
+          <td>
+            <span class="status-badge ${
+              robot.status === "Active"
+                ? "status-active"
+                : robot.status === "Inactive"
+                ? "status-inactive"
+                : "status-offline"
+            }">${robot.status || "Unknown"}</span>
+          </td>
+          <td>${robot.currentTask?.taskId || "N/A"}</td>
+          <td>${
+            robot.singleTaskStatistics?.cStartTime
+              ? formatThaiDate(robot.singleTaskStatistics.cStartTime)
+              : "N/A"
+          }</td>
+          <td>${
+            robot.singleTaskStatistics?.cEndTime
+              ? formatThaiDate(robot.singleTaskStatistics.cEndTime)
+              : "N/A"
+          }</td>
+          <td>
+            Mileage: ${robot.singleTaskStatistics?.mileage || "N/A"}<br>
+            Task Finished: ${
+              robot.singleTaskStatistics?.taskFinishCount || 0
+            }<br>
+            Paused: ${robot.singleTaskStatistics?.taskPauseCount || 0}<br>
+            Canceled: ${robot.singleTaskStatistics?.taskCancelCount || 0}
+          </td>
+          <td>
+            <button class="btn-details" onclick="showRobotDetails('${
+              robot.robotId
+            }')">More Details</button>
+          </td>
+        </tr>`
             )
             .join("");
 
           robotTableBody.innerHTML = robotRowsHtml;
         } catch (error) {
           robotTableBody.innerHTML = `
-      <tr><td colspan="8" style="text-align: center;">Error loading robots.</td></tr>`;
+        <tr><td colspan="7" style="text-align: center;">Error loading robots.</td></tr>`;
           console.error("Error loading robots:", error);
         }
       }
 
       // Initial load and auto-refresh
       loadRobots();
-      setInterval(loadRobots, 30000); // Reload every 30 seconds
+      setInterval(loadRobots, 600000);
     </script>
   </body>
 </html>
