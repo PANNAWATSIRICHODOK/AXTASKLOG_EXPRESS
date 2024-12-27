@@ -31,32 +31,6 @@
         flex-direction: column;
       }
 
-      .sidebar {
-        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
-        color: white;
-        padding: 20px;
-        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.15);
-        position: relative;
-        z-index: 10;
-      }
-
-      .logo {
-        font-size: 24px;
-        font-weight: bold;
-        padding: 12px 0;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 0;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-
-      .logo i {
-        font-size: 28px;
-        color: #93c5fd;
-        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-      }
-
       .main-content {
         flex: 1;
         padding: 20px;
@@ -141,26 +115,13 @@
         color: white;
       }
 
-      .status-active {
-        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-        color: white;
-      }
-
       .status-inactive {
-        background: linear-gradient(
-          135deg,
-          #dff823 0%,
-          #e7e54b 100%
-        ); /* Orange for Idle */
+        background: linear-gradient(135deg, #dff823 0%, #e7e54b 100%);
         color: white;
       }
 
       .status-offline {
-        background: linear-gradient(
-          135deg,
-          #f87171 0%,
-          #ef4444 100%
-        ); /* Red for Offline */
+        background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
         color: white;
       }
 
@@ -201,6 +162,7 @@
         max-height: 90vh;
       }
 
+      /* Rest of your modal styles remain the same */
       .modal-table-wrapper {
         overflow-x: auto;
         margin: -10px;
@@ -305,27 +267,8 @@
       }
 
       @media (min-width: 1024px) {
-        .dashboard {
-          flex-direction: row;
-        }
-
-        .sidebar {
-          width: 280px;
-          height: 100vh;
-          position: fixed;
-          padding: 24px;
-        }
-
         .main-content {
-          margin-left: 280px;
           padding: 40px 48px;
-        }
-
-        .logo {
-          font-size: 26px;
-          padding: 20px 0;
-          margin-bottom: 24px;
-          border-bottom: 2px solid rgba(255, 255, 255, 0.15);
         }
 
         .page-title {
@@ -338,12 +281,7 @@
       }
 
       @media (max-width: 768px) {
-        .sidebar {
-          display: none;
-        }
-
         .main-content {
-          margin-left: 0;
           padding: 16px;
         }
 
@@ -403,12 +341,6 @@
   </head>
   <body>
     <div class="dashboard">
-      <aside class="sidebar">
-        <div class="logo">
-          <i class="fas fa-robot"></i>
-          <span>Robot Control</span>
-        </div>
-      </aside>
       <main class="main-content">
         <h1 class="page-title">
           <i class="fas fa-microchip"></i>
@@ -487,36 +419,36 @@
             ? taskStatistics
                 .map(
                   (stat) => `
-              <tr>
-                <td>${formatThaiOnlyDate(stat.date)}</td>
-                <td>${stat.count !== undefined ? stat.count : "N/A"}</td>
-                <td>${((stat.mileage || 0) / 1000).toFixed(2)} km</td>
-                <td>${((stat.duration || 0) / 3600000).toFixed(2)} hours</td>
-              </tr>`
+                <tr>
+                  <td>${formatThaiOnlyDate(stat.date)}</td>
+                  <td>${stat.count !== undefined ? stat.count : "N/A"}</td>
+                  <td>${((stat.mileage || 0) / 1000).toFixed(2)} km</td>
+                  <td>${((stat.duration || 0) / 3600000).toFixed(2)} hours</td>
+                </tr>`
                 )
                 .join("")
             : `<tr><td colspan="4" class="no-data">No task statistics available.</td></tr>`;
 
           modalBody.innerHTML = `
-      <div class="modal-content">
-        <h2 class="modal-title">Robot ID: ${robotId}</h2>
-        <div class="modal-table-wrapper">
-          <table class="modal-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Task Count</th>
-                <th>Mileage</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody>${taskStatsHtml}</tbody>
-          </table>
-        </div>
-      </div>`;
+        <div class="modal-content">
+          <h2 class="modal-title">Robot ID: ${robotId}</h2>
+          <div class="modal-table-wrapper">
+            <table class="modal-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Task Count</th>
+                  <th>Mileage</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>${taskStatsHtml}</tbody>
+            </table>
+          </div>
+        </div>`;
         } catch (error) {
           modalBody.innerHTML = `
-      <p>Error loading task statistics for Robot <strong>${robotId}</strong>. Please try again later.</p>`;
+        <p>Error loading task statistics for Robot <strong>${robotId}</strong>. Please try again later.</p>`;
           console.error("Error fetching task statistics:", error);
         }
       }
@@ -531,11 +463,11 @@
       async function loadRobots() {
         const robotTableBody = document.getElementById("robotTableBody");
         robotTableBody.innerHTML = `
-    <tr>
-      <td colspan="7" class="loader">
-        <span>Loading robots...</span>
-      </td>
-    </tr>`;
+      <tr>
+        <td colspan="7" class="loader">
+          <span>Loading robots...</span>
+        </td>
+      </tr>`;
 
         try {
           const response = await axios.get(`${backendUrl}/robots`);
@@ -543,7 +475,7 @@
 
           if (robots.length === 0) {
             robotTableBody.innerHTML = `
-            <tr><td colspan="7" style="text-align: center;">No robots available</td></tr>`;
+              <tr><td colspan="7" style="text-align: center;">No robots available</td></tr>`;
             return;
           }
 
@@ -558,51 +490,53 @@
               }
 
               return `
-                <tr>
-                    <td>${robot.robotId || "N/A"}</td>
-                    <td>
-                        <span class="status-badge ${statusBadgeClass}">
-                            ${robot.status || "Unknown"}
-                        </span>
-                    </td>
-                    <td>${robot.currentTask?.taskId || "N/A"}</td>
-                    <td>${
-                      robot.singleTaskStatistics?.cStartTime
-                        ? formatThaiDate(robot.singleTaskStatistics.cStartTime)
-                        : "N/A"
-                    }</td>
-                    <td>${
-                      robot.singleTaskStatistics?.cEndTime
-                        ? formatThaiDate(robot.singleTaskStatistics.cEndTime)
-                        : "N/A"
-                    }</td>
-                    <td>
-                        Mileage: ${
-                          robot.singleTaskStatistics?.mileage || "N/A"
-                        }<br>
-                        Task Finished: ${
-                          robot.singleTaskStatistics?.taskFinishCount || 0
-                        }<br>
-                        Paused: ${
-                          robot.singleTaskStatistics?.taskPauseCount || 0
-                        }<br>
-                        Canceled: ${
-                          robot.singleTaskStatistics?.taskCancelCount || 0
-                        }
-                    </td>
-                    <td>
-                        <button class="btn-details" onclick="showRobotDetails('${
-                          robot.robotId
-                        }')">More Details</button>
-                    </td>
-                </tr>`;
+                  <tr>
+                      <td>${robot.robotId || "N/A"}</td>
+                      <td>
+                          <span class="status-badge ${statusBadgeClass}">
+                              ${robot.status || "Unknown"}
+                          </span>
+                      </td>
+                      <td>${robot.currentTask?.taskId || "N/A"}</td>
+                      <td>${
+                        robot.singleTaskStatistics?.cStartTime
+                          ? formatThaiDate(
+                              robot.singleTaskStatistics.cStartTime
+                            )
+                          : "N/A"
+                      }</td>
+                      <td>${
+                        robot.singleTaskStatistics?.cEndTime
+                          ? formatThaiDate(robot.singleTaskStatistics.cEndTime)
+                          : "N/A"
+                      }</td>
+                      <td>
+                          Mileage: ${
+                            robot.singleTaskStatistics?.mileage || "N/A"
+                          }<br>
+                          Task Finished: ${
+                            robot.singleTaskStatistics?.taskFinishCount || 0
+                          }<br>
+                          Paused: ${
+                            robot.singleTaskStatistics?.taskPauseCount || 0
+                          }<br>
+                          Canceled: ${
+                            robot.singleTaskStatistics?.taskCancelCount || 0
+                          }
+                      </td>
+                      <td>
+                          <button class="btn-details" onclick="showRobotDetails('${
+                            robot.robotId
+                          }')">More Details</button>
+                      </td>
+                  </tr>`;
             })
             .join("");
 
           robotTableBody.innerHTML = robotRowsHtml;
         } catch (error) {
           robotTableBody.innerHTML = `
-        <tr><td colspan="7" style="text-align: center;">Error loading robots.</td></tr>`;
+          <tr><td colspan="7" style="text-align: center;">Error loading robots.</td></tr>`;
           console.error("Error loading robots:", error);
         }
       }
